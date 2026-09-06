@@ -1,0 +1,144 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id               String             @id @default(cuid())
+  name             String?
+  email            String?            @unique
+  emailVerified    DateTime?
+  dateOfBirth      DateTime?
+  image            String?
+  password         String
+  accounts         Account[]
+  PushSubscription PushSubscription[]
+  Routine          Routine[]
+  sessions         Session[]
+  Task             Task[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model NotificationLog {
+  id                 String           @id
+  taskId             Int
+  pushSubscriptionId String
+  dueDate            String
+  dueTime            String
+  sentAt             DateTime         @default(now())
+  PushSubscription   PushSubscription @relation(fields: [pushSubscriptionId], references: [id], onDelete: Cascade)
+  Task               Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, pushSubscriptionId, dueDate, dueTime])
+  @@index([sentAt])
+  @@index([taskId, pushSubscriptionId])
+}
+
+model PushSubscription {
+  id              String            @id
+  endpoint        String            @unique
+  p256dh          String
+  auth            String
+  userId          String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime
+  NotificationLog NotificationLog[]
+  User            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Routine {
+  id          Int          @id @default(autoincrement())
+  title       String
+  description String?
+  dayOfWeek   Int
+  time        String
+  priority    TaskPriority @default(MEDIUM)
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime
+  userId      String
+  User        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Task        Task[]
+
+  @@index([userId, dayOfWeek])
+  @@index([userId, isActive])
+}
+
+model Task {
+  id              Int               @id @default(autoincrement())
+  title           String
+  description     String?
+  dueDate         String
+  dueTime         String            @default("09:00")
+  completed       Boolean           @default(false)
+  status          TaskStatus        @default(TODO)
+  priority        TaskPriority      @default(MEDIUM)
+  routineId       Int?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime
+  userId          String
+  NotificationLog NotificationLog[]
+  Routine         Routine?          @relation(fields: [routineId], references: [id])
+  User            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([routineId])
+  @@index([userId, completed])
+  @@index([userId, createdAt])
+  @@index([userId, dueDate])
+  @@index([userId, status])
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
